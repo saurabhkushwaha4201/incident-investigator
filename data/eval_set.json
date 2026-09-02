@@ -1,0 +1,247 @@
+[
+  {
+    "id": "eval_001",
+    "query": "Users are reporting they were charged twice for the same order in the last hour",
+    "expected_source_doc": "Billing double-charge — Redis fail-open",
+    "expected_root_cause_keywords": ["redis fail-open", "rate limiter", "idempotency", "webhook", "duplicate charge"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_002",
+    "query": "Stripe webhooks are being rejected with a 400 error and subscription events are not being processed",
+    "expected_source_doc": "Webhook HMAC mismatch silent drop",
+    "expected_root_cause_keywords": ["HMAC", "signature", "signing secret", "400", "webhook"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_003",
+    "query": "Thousands of users are being forcibly logged out and cannot sign back in",
+    "expected_source_doc": "Refresh token replay mass logout",
+    "expected_root_cause_keywords": ["refresh token", "token replay", "session invalidation", "logout"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_004",
+    "query": "Billing usage counts are lower than expected after the monthly reconciliation job",
+    "expected_source_doc": "Idempotent upsert race billing undercount",
+    "expected_root_cause_keywords": ["idempotency", "ON CONFLICT", "concurrent", "upsert", "undercount"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_005",
+    "query": "Users are seeing intermittent 503 errors during what appears to be a partial Redis outage",
+    "expected_source_doc": "Redis partial outage circuit breaker flapping",
+    "expected_root_cause_keywords": ["circuit breaker", "flapping", "redis", "503", "quorum"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_006",
+    "query": "Both billing and user service are timing out simultaneously and the Postgres connection pool is exhausted",
+    "expected_source_doc": "Postgres pool exhaustion cascading timeout",
+    "expected_root_cause_keywords": ["connection pool", "postgres", "cascading", "timeout", "invoice"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_007",
+    "query": "Legitimate users are receiving 429 Too Many Requests errors even though they are not sending excessive traffic",
+    "expected_source_doc": "Rate limiter auth retry storm 429",
+    "expected_root_cause_keywords": ["429", "rate limiter", "retry storm", "token refresh", "per-IP limit"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_008",
+    "query": "Immediately after a deployment, all requests started missing the cache and hammering the database",
+    "expected_source_doc": "Thundering herd cache flush",
+    "expected_root_cause_keywords": ["FLUSHDB", "cache flush", "thundering herd", "cache miss", "deploy"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_009",
+    "query": "After deploying user_service, api_gateway is returning connection refused errors and routing to the wrong pod",
+    "expected_source_doc": "DNS TTL stale post deploy",
+    "expected_root_cause_keywords": ["DNS TTL", "stale DNS", "ECONNREFUSED", "deploy", "pod IP"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_010",
+    "query": "billing_service errors are being retried so aggressively that request volume has multiplied by 10x",
+    "expected_source_doc": "Retry storm amplification",
+    "expected_root_cause_keywords": ["retry", "amplification", "fixed delay", "jitter", "connection pool"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_011",
+    "query": "api_gateway is holding connections open for 60 seconds and the thread pool is exhausted",
+    "expected_source_doc": "API Gateway timeout too long",
+    "expected_root_cause_keywords": ["upstream timeout", "60s", "thread pool", "configuration", "YAML"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_012",
+    "query": "All outbound calls from billing_service to Stripe are failing silently with TLS errors",
+    "expected_source_doc": "TLS cert expiry Stripe silent fail",
+    "expected_root_cause_keywords": ["TLS", "certificate", "CERTIFICATE_EXPIRED", "Stripe", "silent"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_013",
+    "query": "During a rolling deployment of auth_service, about half of all authenticated requests are returning 401",
+    "expected_source_doc": "Rolling deploy mixed JWT keys",
+    "expected_root_cause_keywords": ["JWT", "signing key", "rolling deploy", "mixed key", "401"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_014",
+    "query": "Request latency spiked massively for billing and gateway but no errors are being returned",
+    "expected_source_doc": "Log sink backpressure latency",
+    "expected_root_cause_keywords": ["log sink", "Fluentd", "backpressure", "synchronous logging", "latency"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_015",
+    "query": "Some billing_service pods are applying prorated refunds and others are issuing full refunds for the same transaction type",
+    "expected_source_doc": "Config flag partial deploy",
+    "expected_root_cause_keywords": ["feature flag", "partial deploy", "inconsistent", "pod restart", "refund"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_016",
+    "query": "billing_service memory is growing slowly over hours without any visible errors until the pod OOMs",
+    "expected_source_doc": "Thread leak OOM billing",
+    "expected_root_cause_keywords": ["thread leak", "OOM", "ThreadPoolExecutor", "memory", "executor.shutdown"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_017",
+    "query": "auth_service pods on specific hosts are causing intermittent 401 errors and those pods appear to have different system times",
+    "expected_source_doc": "Clock skew JWT 401",
+    "expected_root_cause_keywords": ["NTP", "clock skew", "JWT", "iat", "401"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_018",
+    "query": "After a gateway deployment, all /billing/ API paths are returning 404 but billing_service itself looks healthy",
+    "expected_source_doc": "Route regex change 404 storm",
+    "expected_root_cause_keywords": ["route regex", "404", "routing", "misconfiguration", "api_gateway"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_019",
+    "query": "A customer was charged twice but the first charge succeeded hours ago and the system shows the event was already processed",
+    "expected_source_doc": "Idempotency window too short",
+    "expected_root_cause_keywords": ["idempotency TTL", "Stripe retry", "72-hour", "key expiry", "duplicate charge"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_020",
+    "query": "Billing usage metrics show a gap during a period when Redis memory was under pressure and eviction was active",
+    "expected_source_doc": "Async queue redis eviction data loss",
+    "expected_root_cause_keywords": ["allkeys-lru", "eviction", "usage event", "data loss", "queue"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_021",
+    "query": "An outage in billing_service is causing auth_service to also fail, even though they should be independent",
+    "expected_source_doc": "Auth billing unexpected dependency",
+    "expected_root_cause_keywords": ["cascading dependency", "synchronous call", "token refresh", "billing tier check"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_022",
+    "query": "user_service is returning old account states during the billing cycle peak — recently suspended users are still getting access",
+    "expected_source_doc": "Read replica lag stale data",
+    "expected_root_cause_keywords": ["read replica", "replication lag", "stale data", "account status", "billing cycle"],
+    "difficulty": "clear"
+  },
+  {
+    "id": "eval_023",
+    "query": "We have duplicate financial transactions and no Redis errors in our logs from that window",
+    "expected_source_doc": "Idempotency window too short",
+    "expected_root_cause_keywords": ["idempotency TTL", "key expiry", "duplicate", "Stripe retry"],
+    "difficulty": "paraphrased"
+  },
+  {
+    "id": "eval_024",
+    "query": "People are being signed out of the app unexpectedly and cannot get back in — support volume is through the roof",
+    "expected_source_doc": "Refresh token replay mass logout",
+    "expected_root_cause_keywords": ["refresh token", "session invalidation", "token replay"],
+    "difficulty": "paraphrased"
+  },
+  {
+    "id": "eval_025",
+    "query": "Payment processor is seeing repeated transactions for the same customer but our service logs show it was processed successfully the first time",
+    "expected_source_doc": "Billing double-charge — Redis fail-open",
+    "expected_root_cause_keywords": ["redis fail-open", "idempotency", "webhook retry", "duplicate"],
+    "difficulty": "paraphrased"
+  },
+  {
+    "id": "eval_026",
+    "query": "After a credential rotation we stopped receiving financial events from our payment processor",
+    "expected_source_doc": "Webhook HMAC mismatch silent drop",
+    "expected_root_cause_keywords": ["HMAC", "signing secret", "credential rotation", "webhook"],
+    "difficulty": "paraphrased"
+  },
+  {
+    "id": "eval_027",
+    "query": "The new version of auth we just shipped is causing roughly half the users who try to make requests to get access denied errors",
+    "expected_source_doc": "Rolling deploy mixed JWT keys",
+    "expected_root_cause_keywords": ["JWT", "signing key", "rolling deploy", "401"],
+    "difficulty": "paraphrased"
+  },
+  {
+    "id": "eval_028",
+    "query": "Requests are slow but not failing and we can see threads are piling up — no errors in the error log",
+    "expected_source_doc": "Log sink backpressure latency",
+    "expected_root_cause_keywords": ["Fluentd", "backpressure", "synchronous", "latency", "thread"],
+    "difficulty": "paraphrased"
+  },
+  {
+    "id": "eval_029",
+    "query": "The gateway seems fine and backend services seem fine individually but end users are getting connection errors on some API paths",
+    "expected_source_doc": "Route regex change 404 storm",
+    "expected_root_cause_keywords": ["route regex", "routing", "404", "misconfiguration"],
+    "difficulty": "paraphrased"
+  },
+  {
+    "id": "eval_030",
+    "query": "We noticed our revenue figures were 3% lower than upstream event counts for this billing period",
+    "expected_source_doc": "Idempotent upsert race billing undercount",
+    "expected_root_cause_keywords": ["idempotency", "concurrent", "ON CONFLICT", "undercount"],
+    "difficulty": "paraphrased"
+  },
+  {
+    "id": "eval_031",
+    "query": "Users are complaining about a problem in production",
+    "expected_source_doc": null,
+    "expected_root_cause_keywords": [],
+    "difficulty": "insufficient_evidence"
+  },
+  {
+    "id": "eval_032",
+    "query": "Something went wrong with payments earlier today",
+    "expected_source_doc": null,
+    "expected_root_cause_keywords": [],
+    "difficulty": "insufficient_evidence"
+  },
+  {
+    "id": "eval_033",
+    "query": "We are seeing some elevated error rates across a few services",
+    "expected_source_doc": null,
+    "expected_root_cause_keywords": [],
+    "difficulty": "insufficient_evidence"
+  },
+  {
+    "id": "eval_034",
+    "query": "Authentication is not working for some users",
+    "expected_source_doc": null,
+    "expected_root_cause_keywords": [],
+    "difficulty": "insufficient_evidence"
+  },
+  {
+    "id": "eval_035",
+    "query": "The system is slow right now",
+    "expected_source_doc": null,
+    "expected_root_cause_keywords": [],
+    "difficulty": "insufficient_evidence"
+  }
+]

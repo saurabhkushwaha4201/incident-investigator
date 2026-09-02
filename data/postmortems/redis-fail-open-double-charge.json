@@ -1,0 +1,15 @@
+{
+  "title": "Billing double-charge — Redis fail-open",
+  "service_tags": ["api_gateway", "redis", "billing_service"],
+  "timeline": [
+    {"time": "2026-07-15T14:10:00Z", "event": "Marketing email campaign delivers; traffic spike begins"},
+    {"time": "2026-07-15T14:22:00Z", "event": "Redis connection pool hits 100% utilization"},
+    {"time": "2026-07-15T14:23:00Z", "event": "Rate limiter enters fail-open mode; idempotency lookups begin returning misses"},
+    {"time": "2026-07-15T14:24:00Z", "event": "First duplicate webhook processed; first double-charge occurs"},
+    {"time": "2026-07-15T14:30:00Z", "event": "PagerDuty fires on Redis pool exhaustion; on-call paged"},
+    {"time": "2026-07-15T14:38:00Z", "event": "On-call correlates billing duplicates with Redis outage"},
+    {"time": "2026-07-15T14:45:00Z", "event": "Redis restarted; pool drains and reconnects"},
+    {"time": "2026-07-15T14:48:00Z", "event": "Duplicate webhook processing stops; no further double-charges"},
+    {"time": "2026-07-15T15:02:00Z", "event": "Database-level idempotency hotfix deployed"}
+  ]
+}

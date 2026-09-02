@@ -1,0 +1,36 @@
+{
+  "title": "Idempotency window too short",
+  "postmortem_body": "# Idempotency window too short\n\n## Date\n2026-10-10\n\n## Authors\nIncident Response Team\n\n## Status\nFinal\n\n## Summary\nOn October 10th, 2026, an extended delay in Stripe's webhook delivery system exposed a flaw in our idempotency implementation. The `billing_service` was configured to expire idempotency keys after 1 hour. When Stripe delivered legitimate webhook retries 2 hours late, our system treated them as new events, resulting in duplicate charges for several dozen customers.\n\n## Impact\nSEV2. 75 customers were charged twice for their monthly subscription renewals. This caused significant customer frustration and required manual intervention by the finance team to issue refunds and apologize.\n\n## Root Cause\nThe `billing_service` uses `redis` to store idempotency keys to deduplicate incoming Stripe webhooks before writing to `postgres`. To save memory, these keys were configured with a TTL (Time To Live) of 1 hour. On this day, Stripe experienced internal delays and paused webhook delivery. When they resumed 2 hours later, they re-sent events that our `api_gateway` had partially acknowledged but failed to fully process. Because 2 hours had passed, the idempotency keys in `redis` had expired. The `billing_service` received the retried webhooks, found no existing key, and processed the charge a second time.\n\n## Trigger\nAn external delay at Stripe caused webhooks to be retried outside of our expected 1-hour idempotency window.\n\n## Resolution\nEngineers ran a script to cross-reference Stripe transaction IDs in our `postgres` database, identifying the 75 duplicate records. Refunds were initiated via the Stripe API. A hotfix was deployed to increase the idempotency key TTL to 72 hours.\n\n## Detection\nCustomer support received a flurry of tickets from users complaining about double charges on their credit card statements.\n\n## Timeline\n- 2026-10-10T08:00:00Z - Stripe begins experiencing webhook delivery delays.\n- 2026-10-10T09:00:00Z - Idempotency keys for early, partially-processed events expire in `redis`.\n- 2026-10-10T10:00:00Z - Stripe resumes delivery and retries old webhooks.\n- 2026-10-10T10:05:00Z - `billing_service` processes retries as new events; duplicate charges occur.\n- 2026-10-10T11:30:00Z - Customer support escalates double-charge complaints.\n- 2026-10-10T13:00:00Z - TTL increased to 72 hours; reconciliation script run.\n\n## Action Items\n- Increase idempotency key TTL in `redis` to 72 hours to accommodate maximum external retry windows.\n- Move primary idempotency storage from ephemeral `redis` to persistent `postgres` records.\n- Implement an automated daily audit that flags duplicate external transaction IDs.\n\n## Lessons Learned\nIdempotency windows must always be larger than the maximum possible retry window of any upstream provider. Using short TTLs to save memory on critical financial deduplication is a false economy.\n",
+  "service_tags": [
+    "redis",
+    "postgres",
+    "billing_service",
+    "api_gateway"
+  ],
+  "timeline": [
+    {
+      "time": "2026-10-10T08:00:00Z",
+      "event": "Stripe begins experiencing webhook delivery delays."
+    },
+    {
+      "time": "2026-10-10T09:00:00Z",
+      "event": "Idempotency keys for early, partially-processed events expire in `redis`."
+    },
+    {
+      "time": "2026-10-10T10:00:00Z",
+      "event": "Stripe resumes delivery and retries old webhooks."
+    },
+    {
+      "time": "2026-10-10T10:05:00Z",
+      "event": "`billing_service` processes retries as new events; duplicate charges occur."
+    },
+    {
+      "time": "2026-10-10T11:30:00Z",
+      "event": "Customer support escalates double-charge complaints."
+    },
+    {
+      "time": "2026-10-10T13:00:00Z",
+      "event": "TTL increased to 72 hours; reconciliation script run."
+    }
+  ]
+}

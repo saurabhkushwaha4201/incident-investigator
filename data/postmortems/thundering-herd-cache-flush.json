@@ -1,0 +1,36 @@
+{
+  "title": "Thundering herd cache flush",
+  "postmortem_body": "# Thundering herd cache flush\n\n## Date\n2026-09-02\n\n## Authors\nIncident Response Team\n\n## Status\nFinal\n\n## Summary\nOn September 2nd, 2026, a misconfigured deployment script executed a global flush of the `redis` cache. This caused an immediate cache stampede (thundering herd) as all incoming API requests missed the cache simultaneously, resulting in a massive overload of the `postgres` database and bringing down the platform for 18 minutes.\n\n## Impact\nSEV1. 100% of API traffic was disrupted for 18 minutes, resulting in widespread 503s across all services. \n\n## Root Cause\nThe `user_service` relies heavily on `redis` to cache user profiles and account metadata to reduce load on `postgres`. During a deployment of a minor configuration change, the CI/CD pipeline executed a `FLUSHALL` command on the `redis` cluster, intending to clear a specific staging environment, but it was mistakenly run against production. Upon the flush, thousands of concurrent requests to the `api_gateway` routed to the `user_service` experienced cache misses. The `user_service` subsequently forwarded all these requests to `postgres`. The database CPU spiked to 100%, and connection pools were exhausted, leading to system-wide timeouts.\n\n## Trigger\nA CI/CD pipeline misconfiguration executed a global cache flush on the production `redis` cluster during a routine deployment.\n\n## Resolution\nTraffic was temporarily diverted at the `api_gateway` to allow `postgres` to recover. We then slowly ramped up traffic over 10 minutes to allow the `redis` cache to warm up gradually without overwhelming the database. \n\n## Detection\nAlerts for `redis` cache hit rate dropping to 0% fired immediately, followed by severe latency alerts from `postgres` and the `api_gateway`.\n\n## Timeline\n- 2026-09-02T14:00:00Z - CI/CD pipeline executes `FLUSHALL` on production `redis`.\n- 2026-09-02T14:01:00Z - Cache hit rate drops to 0; cache stampede begins.\n- 2026-09-02T14:02:00Z - `postgres` CPU hits 100%, connection pools exhaust.\n- 2026-09-02T14:05:00Z - Engineering identifies the cache flush.\n- 2026-09-02T14:10:00Z - `api_gateway` traffic throttled to 10% to allow database recovery.\n- 2026-09-02T14:18:00Z - Cache sufficiently warmed; traffic restored to 100%.\n\n## Action Items\n- Restrict `FLUSHALL` command access in production `redis` clusters.\n- Implement a cache warming script for deployment procedures.\n- Add random jitter to cache TTLs in `user_service` to prevent simultaneous expiration.\n\n## Lessons Learned\nCold cache scenarios must be explicitly tested. A database sized for a 95% cache hit rate will instantly collapse if the cache is bypassed.\n",
+  "service_tags": [
+    "redis",
+    "postgres",
+    "user_service",
+    "api_gateway"
+  ],
+  "timeline": [
+    {
+      "time": "2026-09-02T14:00:00Z",
+      "event": "CI/CD pipeline executes `FLUSHALL` on production `redis`."
+    },
+    {
+      "time": "2026-09-02T14:01:00Z",
+      "event": "Cache hit rate drops to 0; cache stampede begins."
+    },
+    {
+      "time": "2026-09-02T14:02:00Z",
+      "event": "`postgres` CPU hits 100%, connection pools exhaust."
+    },
+    {
+      "time": "2026-09-02T14:05:00Z",
+      "event": "Engineering identifies the cache flush."
+    },
+    {
+      "time": "2026-09-02T14:10:00Z",
+      "event": "`api_gateway` traffic throttled to 10% to allow database recovery."
+    },
+    {
+      "time": "2026-09-02T14:18:00Z",
+      "event": "Cache sufficiently warmed; traffic restored to 100%."
+    }
+  ]
+}

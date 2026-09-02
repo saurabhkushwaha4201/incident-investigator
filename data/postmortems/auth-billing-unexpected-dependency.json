@@ -1,0 +1,31 @@
+{
+  "title": "Auth billing unexpected dependency",
+  "postmortem_body": "# Auth billing unexpected dependency\n\n## Date\n2026-10-18\n\n## Authors\nIncident Response Team\n\n## Status\nFinal\n\n## Summary\nOn October 18th, 2026, an unannounced architectural change coupled the `auth_service` directly to the `billing_service`. When the `billing_service` experienced a brief database outage, this unexpected dependency caused the `auth_service` to also fail, turning a localized billing issue into a global authentication outage that locked all users out of the platform.\n\n## Impact\nSEV1. 100% of logins and API requests requiring token validation failed for 45 minutes. The blast radius was significantly larger than the initial failure.\n\n## Root Cause\nHistorically, the `auth_service` operated independently to validate JWTs. A recent feature required checking a user's subscription status during login to populate a custom claim in the JWT. To implement this, engineers added a synchronous HTTP call from the `auth_service` to the `billing_service` on the critical login path. When a bad migration locked a table in `postgres`, the `billing_service` became unresponsive. Because the `auth_service` was now synchronously dependent on `billing_service`, all login attempts timed out. The architectural failure was tight coupling without circuit breakers or fallback mechanisms.\n\n## Trigger\nA bad database migration locked a core table in `postgres`, taking down the `billing_service`.\n\n## Resolution\nThe database migration was aborted, freeing the locks and restoring the `billing_service`, which automatically restored the `auth_service`. A hotfix was subsequently deployed to the `auth_service` to wrap the billing call in a circuit breaker and fail open (issue the JWT without the custom claim) if the `billing_service` is unavailable.\n\n## Detection\nAlerts fired for 500 errors in the `billing_service`, followed almost immediately by a complete collapse of successful logins in the `auth_service`.\n\n## Timeline\n- 2026-10-18T14:00:00Z - Bad migration applied to `postgres`.\n- 2026-10-18T14:01:00Z - `billing_service` becomes unresponsive.\n- 2026-10-18T14:02:00Z - `auth_service` begins timing out on all login requests.\n- 2026-10-18T14:15:00Z - Engineering team discovers the undocumented synchronous dependency.\n- 2026-10-18T14:45:00Z - Migration aborted; both services recover.\n\n## Action Items\n- Remove synchronous cross-service dependencies on the critical authentication path.\n- Implement circuit breakers and graceful degradation for all inter-service HTTP calls.\n- Enforce strict architectural reviews for new feature dependencies.\n\n## Lessons Learned\nCoupling core infrastructure (auth) to higher-level business logic (billing) expands the blast radius of failures unacceptably. The critical path must remain isolated.\n",
+  "service_tags": [
+    "auth_service",
+    "postgres",
+    "billing_service"
+  ],
+  "timeline": [
+    {
+      "time": "2026-10-18T14:00:00Z",
+      "event": "Bad migration applied to `postgres`."
+    },
+    {
+      "time": "2026-10-18T14:01:00Z",
+      "event": "`billing_service` becomes unresponsive."
+    },
+    {
+      "time": "2026-10-18T14:02:00Z",
+      "event": "`auth_service` begins timing out on all login requests."
+    },
+    {
+      "time": "2026-10-18T14:15:00Z",
+      "event": "Engineering team discovers the undocumented synchronous dependency."
+    },
+    {
+      "time": "2026-10-18T14:45:00Z",
+      "event": "Migration aborted; both services recover."
+    }
+  ]
+}

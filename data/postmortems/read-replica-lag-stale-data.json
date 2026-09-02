@@ -1,0 +1,34 @@
+{
+  "title": "Read replica lag stale data",
+  "postmortem_body": "# Read replica lag stale data\n\n## Date\n2026-10-22\n\n## Authors\nIncident Response Team\n\n## Status\nFinal\n\n## Summary\nOn October 22nd, 2026, a massive data import job caused severe replication lag between the primary `postgres` instance and its read replicas. Because the `user_service` was configured to read exclusively from the replicas for performance, users experienced a confusing \"stale data\" state where profile updates appeared to revert themselves immediately after being saved.\n\n## Impact\nSEV2. Over a 2-hour period, thousands of users were unable to reliably update their profiles or see newly created API keys. While no data was actually lost, the user experience was severely degraded, leading to a flood of support tickets claiming the system was broken.\n\n## Root Cause\nThe `postgres` database utilizes asynchronous replication to two read replicas. The `user_service` directs all read queries to these replicas to reduce load on the primary node. A massive, unthrottled data import job was executed on the primary node by the analytics team. This generated a massive WAL (Write-Ahead Log) backlog, causing replication lag to spike from 100ms to over 45 seconds. When a user updated their profile (written to the primary) and then refreshed the page (read from the replica), the replica returned the old data because it hadn't yet processed the update.\n\n## Trigger\nAn unthrottled historical data backfill script run by the analytics team against the production primary database.\n\n## Resolution\nThe data import script was forcefully terminated. The replication lag slowly caught up over the next 15 minutes. Once the replicas were in sync, the stale data issue resolved itself.\n\n## Detection\nCustomer support received numerous reports of \"ghost updates\" where users would change their name, see success, but then see their old name upon refreshing the page.\n\n## Timeline\n- 2026-10-22T09:00:00Z - Analytics team begins unthrottled data import.\n- 2026-10-22T09:15:00Z - `postgres` replication lag exceeds 30 seconds.\n- 2026-10-22T09:30:00Z - Users begin experiencing and reporting stale data on reads.\n- 2026-10-22T10:30:00Z - Engineering correlates the issue with the high replication lag metric.\n- 2026-10-22T10:45:00Z - Import script killed.\n- 2026-10-22T11:00:00Z - Replication catches up; issue resolves.\n\n## Action Items\n- Implement \"read-your-own-writes\" consistency in the `user_service` by routing reads to the primary for a short window after a write.\n- Throttle all administrative data imports and run them against dedicated offline instances when possible.\n- Set up alerts for replication lag exceeding 5 seconds.\n\n## Lessons Learned\nEventual consistency is a powerful scaling tool but provides a terrible user experience if the propagation delay becomes noticeable to a human. Applications must design around replication lag.\n",
+  "service_tags": [
+    "postgres",
+    "user_service"
+  ],
+  "timeline": [
+    {
+      "time": "2026-10-22T09:00:00Z",
+      "event": "Analytics team begins unthrottled data import."
+    },
+    {
+      "time": "2026-10-22T09:15:00Z",
+      "event": "`postgres` replication lag exceeds 30 seconds."
+    },
+    {
+      "time": "2026-10-22T09:30:00Z",
+      "event": "Users begin experiencing and reporting stale data on reads."
+    },
+    {
+      "time": "2026-10-22T10:30:00Z",
+      "event": "Engineering correlates the issue with the high replication lag metric."
+    },
+    {
+      "time": "2026-10-22T10:45:00Z",
+      "event": "Import script killed."
+    },
+    {
+      "time": "2026-10-22T11:00:00Z",
+      "event": "Replication catches up; issue resolves."
+    }
+  ]
+}

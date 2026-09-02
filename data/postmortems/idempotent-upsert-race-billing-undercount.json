@@ -1,0 +1,35 @@
+{
+  "title": "Idempotent upsert race billing undercount",
+  "postmortem_body": "# Idempotent upsert race billing undercount\n\n## Date\n2026-08-12\n\n## Authors\nIncident Response Team\n\n## Status\nFinal\n\n## Summary\nOn August 12th, 2026, a race condition in the `billing_service` allowed concurrent API usage reports to bypass the `postgres` idempotency constraint. This resulted in double-metering of the same event, which paradoxically led to an undercount in the final billing aggregation due to a subsequent data deduplication pipeline misinterpreting the state.\n\n## Impact\nSEV2. Approximately 5% of API usage events for high-volume customers were undercounted over a 24-hour period. This resulted in an estimated $4,000 loss in unbilled usage.\n\n## Root Cause\nThe `billing_service` records API usage events in `postgres`. It uses an idempotency key provided by the client. The application logic first checked if the key existed; if not, it inserted the record. However, it did not rely on a unique constraint at the `postgres` schema level for the idempotency key. Concurrent requests hit the `billing_service` before the first request could write the key, bypassing the application-level check. Both records were inserted. Later, the billing aggregation job saw duplicate keys and, assuming data corruption, dropped both records instead of keeping one.\n\n## Trigger\nA major customer migrated their infrastructure, causing a sudden influx of heavily parallelized, retried API requests.\n\n## Resolution\nA schema migration was immediately applied to `postgres` to add a `UNIQUE` constraint on the idempotency key column. The `billing_service` code was updated to rely on the `ON CONFLICT DO NOTHING` database feature rather than a read-then-write application-level check.\n\n## Detection\nThe finance team noticed a discrepancy between `api_gateway` request logs and the billed usage for a specific enterprise customer during a routine daily audit.\n\n## Timeline\n- 2026-08-12T02:00:00Z - Customer begins parallel migration script.\n- 2026-08-12T02:15:00Z - Race conditions in `billing_service` lead to duplicate idempotency keys in `postgres`.\n- 2026-08-12T04:00:00Z - Billing aggregation job runs and drops duplicates, causing undercount.\n- 2026-08-13T09:00:00Z - Finance identifies discrepancy.\n- 2026-08-13T11:00:00Z - Engineering identifies the read-then-write anti-pattern.\n- 2026-08-13T13:00:00Z - Schema constraint added; code deployed.\n\n## Action Items\n- Enforce unique constraints at the `postgres` schema level for all idempotency keys.\n- Refactor all read-then-write patterns in `billing_service` to use `ON CONFLICT`.\n- Fix the billing aggregation job to keep the first record rather than dropping all duplicates.\n\n## Lessons Learned\nApplication-level idempotency checks are insufficient under high concurrency. The database must be the final arbiter of uniqueness. Data pipelines must be robust against duplicates and not overreact by dropping valid data.\n",
+  "service_tags": [
+    "postgres",
+    "billing_service",
+    "api_gateway"
+  ],
+  "timeline": [
+    {
+      "time": "2026-08-12T02:00:00Z",
+      "event": "Customer begins parallel migration script."
+    },
+    {
+      "time": "2026-08-12T02:15:00Z",
+      "event": "Race conditions in `billing_service` lead to duplicate idempotency keys in `postgres`."
+    },
+    {
+      "time": "2026-08-12T04:00:00Z",
+      "event": "Billing aggregation job runs and drops duplicates, causing undercount."
+    },
+    {
+      "time": "2026-08-13T09:00:00Z",
+      "event": "Finance identifies discrepancy."
+    },
+    {
+      "time": "2026-08-13T11:00:00Z",
+      "event": "Engineering identifies the read-then-write anti-pattern."
+    },
+    {
+      "time": "2026-08-13T13:00:00Z",
+      "event": "Schema constraint added; code deployed."
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "title": "TLS cert expiry Stripe silent fail",
+  "postmortem_body": "# TLS cert expiry Stripe silent fail\n\n## Date\n2026-09-15\n\n## Authors\nIncident Response Team\n\n## Status\nFinal\n\n## Summary\nOn September 15th, 2026, an expired TLS client certificate used by the `billing_service` to authenticate with a legacy Stripe proxy endpoint caused all outbound payment calls to fail. Due to improper error handling, the failures were logged as generic network errors, and the system failed silently, leaving users thinking their payments succeeded.\n\n## Impact\nSEV2. Over a 4-hour window, 350 subscription upgrades were processed by the frontend but never successfully communicated to Stripe. This resulted in users receiving premium access without being charged.\n\n## Root Cause\nThe `billing_service` communicates with a specific Stripe endpoint that requires Mutual TLS (mTLS). The client certificate loaded into the `billing_service` expired. When the service attempted to establish a connection, the handshake failed. However, the exception handling block in the `billing_service` caught the TLS handshake error and inadvertently swallowed it, returning a HTTP 200 OK to the calling `api_gateway`. As a result, the system acted as if the transaction succeeded, granting user access without executing the financial charge.\n\n## Trigger\nThe natural expiration of a 1-year mTLS client certificate that was not tracked in our centralized certificate management system.\n\n## Resolution\nThe certificate was manually renewed and injected into the `billing_service` pods. A script was run to identify the 350 users who received unbilled upgrades and retroactively bill them via Stripe.\n\n## Detection\nThe finance team noticed a sharp discrepancy between daily active premium users and the day's total Stripe revenue.\n\n## Timeline\n- 2026-09-15T00:00:00Z - Client TLS certificate expires.\n- 2026-09-15T00:15:00Z - First outbound Stripe call fails silently.\n- 2026-09-15T04:00:00Z - Finance team detects revenue anomaly.\n- 2026-09-15T04:30:00Z - Engineering discovers the swallowed TLS exception in logs.\n- 2026-09-15T05:00:00Z - Certificate renewed; `billing_service` restarted.\n- 2026-09-15T06:00:00Z - Missed charges retroactively applied.\n\n## Action Items\n- Add all client certificates to the centralized tracking and alerting system.\n- Fix the exception handling in `billing_service` to propagate critical integration errors rather than returning 200 OK.\n- Implement synthetic monitoring that actually verifies end-to-end payment flow.\n\n## Lessons Learned\nSwallowing errors to maintain a facade of stability leads to data corruption and financial loss. Always surface integration failures explicitly.\n",
+  "service_tags": [
+    "billing_service",
+    "api_gateway"
+  ],
+  "timeline": [
+    {
+      "time": "2026-09-15T00:00:00Z",
+      "event": "Client TLS certificate expires."
+    },
+    {
+      "time": "2026-09-15T00:15:00Z",
+      "event": "First outbound Stripe call fails silently."
+    },
+    {
+      "time": "2026-09-15T04:00:00Z",
+      "event": "Finance team detects revenue anomaly."
+    },
+    {
+      "time": "2026-09-15T04:30:00Z",
+      "event": "Engineering discovers the swallowed TLS exception in logs."
+    },
+    {
+      "time": "2026-09-15T05:00:00Z",
+      "event": "Certificate renewed; `billing_service` restarted."
+    },
+    {
+      "time": "2026-09-15T06:00:00Z",
+      "event": "Missed charges retroactively applied."
+    }
+  ]
+}

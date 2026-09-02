@@ -1,0 +1,31 @@
+{
+  "title": "Rate limiter auth retry storm 429",
+  "postmortem_body": "# Rate limiter auth retry storm 429\n\n## Date\n2026-08-28\n\n## Authors\nIncident Response Team\n\n## Status\nFinal\n\n## Summary\nOn August 28th, 2026, a logic error in our mobile SDK caused it to enter a tight retry loop when the `auth_service` returned a specific token refresh error. This flood of retries quickly hit the per-IP rate limit in the `api_gateway`, resulting in legitimate users on shared IP addresses (like corporate NATs or public Wi-Fi) receiving 429 Too Many Requests errors.\n\n## Impact\nSEV2. Mobile users on updated SDK versions, as well as innocent bystanders sharing their IP addresses, were completely blocked from using the API for up to an hour. \n\n## Root Cause\nThe `api_gateway` implements rate limiting backed by `redis` based on the client's IP address. A bug in the new mobile SDK caused it to retry token refresh requests infinitely without backoff if the `auth_service` returned a 400 Bad Request. When a single mobile client entered this loop, it blasted the `api_gateway` with thousands of requests per second. The `api_gateway` correctly applied the rate limit and began returning 429s. However, because the limit is per-IP, all other users behind the same NAT gateway were also blocked.\n\n## Trigger\nA new version of the mobile SDK was released to the app stores.\n\n## Resolution\nThe rate limiting rules in the `api_gateway` were temporarily adjusted to rate limit by user ID instead of IP address for authenticated routes. The mobile SDK was patched to implement exponential backoff and to stop retrying on 4xx errors.\n\n## Detection\nA sudden spike in 429 errors from the `api_gateway` triggered an alert. Simultaneously, customer support received complaints from users in a specific corporate office who could not access the app.\n\n## Timeline\n- 2026-08-28T09:00:00Z - Mobile SDK v1.5 released.\n- 2026-08-28T10:30:00Z - Clients hit the refresh error and begin retry storm.\n- 2026-08-28T10:35:00Z - `api_gateway` begins rate-limiting heavily; 429 alerts fire.\n- 2026-08-28T11:00:00Z - Engineering correlates the IPs to corporate networks and identifies the SDK bug.\n- 2026-08-28T11:30:00Z - `api_gateway` rate limiting rules adjusted to mitigate IP blocking.\n\n## Action Items\n- Release hotfix for mobile SDK to fix retry logic.\n- Enhance `api_gateway` rate limiting to combine IP and device fingerprinting for more granular blocking.\n- Add specific monitoring for token refresh endpoint failure rates.\n\n## Lessons Learned\nIP-based rate limiting is a blunt instrument that can easily cause collateral damage during a client-side retry storm. SDKs must strictly adhere to backoff protocols.\n",
+  "service_tags": [
+    "redis",
+    "auth_service",
+    "api_gateway"
+  ],
+  "timeline": [
+    {
+      "time": "2026-08-28T09:00:00Z",
+      "event": "Mobile SDK v1.5 released."
+    },
+    {
+      "time": "2026-08-28T10:30:00Z",
+      "event": "Clients hit the refresh error and begin retry storm."
+    },
+    {
+      "time": "2026-08-28T10:35:00Z",
+      "event": "`api_gateway` begins rate-limiting heavily; 429 alerts fire."
+    },
+    {
+      "time": "2026-08-28T11:00:00Z",
+      "event": "Engineering correlates the IPs to corporate networks and identifies the SDK bug."
+    },
+    {
+      "time": "2026-08-28T11:30:00Z",
+      "event": "`api_gateway` rate limiting rules adjusted to mitigate IP blocking."
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "title": "Postgres pool exhaustion cascading timeout",
+  "postmortem_body": "# Postgres pool exhaustion cascading timeout\n\n## Date\n2026-08-25\n\n## Authors\nIncident Response Team\n\n## Status\nFinal\n\n## Summary\nOn August 25th, 2026, a sudden spike in billing reconciliation jobs overwhelmed the `postgres` connection pool. With all connections in use, incoming requests to both `billing_service` and `user_service` queued up, eventually timing out. This created a cascading failure that brought down most of the backend API for 25 minutes.\n\n## Impact\nSEV2. 100% of API requests requiring database access failed with 504 Gateway Timeout or 500 Internal Server Error for 25 minutes. Customer dashboards failed to load, and new account creations were halted.\n\n## Root Cause\nThe `billing_service` and `user_service` share a single `postgres` database cluster. During an end-of-month reconciliation spike, the `billing_service` spawned hundreds of worker threads, instantly exhausting the `postgres` connection pool (max 10/10 active connections per pgbouncer node). As `user_service` and `billing_service` web requests attempted to checkout connections, they blocked. Thread pools in the services filled up, and the `api_gateway` eventually timed out waiting for responses, causing a cascading failure.\n\n## Trigger\nA cron job for end-of-month billing reconciliation was accidentally configured to run synchronously with high concurrency instead of using the async job queue.\n\n## Resolution\nThe rogue cron job was manually killed. The `postgres` connection pool was flushed, and `billing_service` pods were restarted to clear stuck threads. Services recovered immediately once connections were freed.\n\n## Detection\nAlerts for high response latency at the `api_gateway` fired, quickly followed by `postgres` connection pool exhaustion alerts.\n\n## Timeline\n- 2026-08-25T08:00:00Z - End-of-month reconciliation cron job starts.\n- 2026-08-25T08:02:00Z - `postgres` connection pool reaches 100% utilization.\n- 2026-08-25T08:05:00Z - `user_service` and `billing_service` start queuing requests; thread pools fill.\n- 2026-08-25T08:10:00Z - `api_gateway` starts returning 504 Timeouts. Alerts trigger.\n- 2026-08-25T08:20:00Z - Engineering identifies rogue cron job and terminates it.\n- 2026-08-25T08:25:00Z - Services restarted; traffic flow returns to normal.\n\n## Action Items\n- Separate `postgres` connection pools for web traffic and background jobs.\n- Refactor the reconciliation cron job to use the async job queue.\n- Implement strict timeouts on database connection checkout in `user_service` and `billing_service`.\n\n## Lessons Learned\nShared connection pools are a major vector for cascading failures. Background jobs must be isolated from synchronous web traffic resources.\n",
+  "service_tags": [
+    "billing_service",
+    "postgres",
+    "user_service",
+    "api_gateway"
+  ],
+  "timeline": [
+    {
+      "time": "2026-08-25T08:00:00Z",
+      "event": "End-of-month reconciliation cron job starts."
+    },
+    {
+      "time": "2026-08-25T08:02:00Z",
+      "event": "`postgres` connection pool reaches 100% utilization."
+    },
+    {
+      "time": "2026-08-25T08:05:00Z",
+      "event": "`user_service` and `billing_service` start queuing requests; thread pools fill."
+    },
+    {
+      "time": "2026-08-25T08:10:00Z",
+      "event": "`api_gateway` starts returning 504 Timeouts. Alerts trigger."
+    },
+    {
+      "time": "2026-08-25T08:20:00Z",
+      "event": "Engineering identifies rogue cron job and terminates it."
+    },
+    {
+      "time": "2026-08-25T08:25:00Z",
+      "event": "Services restarted; traffic flow returns to normal."
+    }
+  ]
+}
