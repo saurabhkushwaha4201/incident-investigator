@@ -1,12 +1,16 @@
-# Incident Investigator
+# 🔍 Incident Investigator
 
-> Semantic search + reasoning over an engineering team's incident history.
-> Given a new incident description, surfaces relevant past postmortems, proposes
-> a root cause with citations, and explicitly refuses to guess when evidence is insufficient.
+[![CI Pipeline](https://github.com/saurabhkushwaha4201/incident-investigator/actions/workflows/ci.yml/badge.svg)](https://github.com/saurabhkushwaha4201/incident-investigator/actions/workflows/ci.yml)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=flat&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+
+> **Semantic search + reasoning over an engineering team's incident history.**  
+> Given a new incident description, surfaces relevant past postmortems, proposes a root cause with citations, and explicitly refuses to guess when evidence is insufficient.
 
 ---
 
-## The Problem
+## ⚡ The Problem
 
 When production incidents happen, on-call engineers search their team's postmortem history for similar past incidents. Existing tools fail at this:
 
@@ -18,7 +22,7 @@ This project builds a semantic layer over an org's incident knowledge base — i
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 # 1. Start Postgres + pgvector
@@ -43,9 +47,9 @@ pytest tests/test_phase1.py -v
 
 ---
 
-## API
+## 🌐 API Usage
 
-### Ingest an incident
+### 1. Ingest an incident
 ```http
 POST /incidents
 Content-Type: application/json
@@ -60,17 +64,15 @@ Content-Type: application/json
   ]
 }
 ```
-
 **What happens:** the endpoint atomically chunks + embeds the postmortem body, generates 20-80 synthetic log rows per timeline event (clustered ±30s), and commits everything in a single transaction.
 
-### Query the system
+### 2. Query the system
 ```http
 POST /query
 Content-Type: application/json
 
 {"query": "Users are reporting they were charged twice for the same order", "k": 5}
 ```
-
 **Response:**
 ```json
 {
@@ -81,9 +83,9 @@ Content-Type: application/json
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-```
+```text
 POST /incidents
     │
     ├─ chunk_text()     RecursiveCharacterTextSplitter (paragraph-first)
@@ -106,9 +108,9 @@ POST /query
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
-```
+```text
 ├── main.py                    FastAPI app, router registration, create_all()
 ├── routers/
 │   ├── incidents.py           POST /incidents
@@ -125,33 +127,35 @@ POST /query
 │   ├── database.py            Engine + get_db() dependency
 │   └── init.sql               CREATE EXTENSION vector (runs once)
 ├── data/
-│   ├── postmortems/           25 .md + .json pairs
+│   ├── postmortems/           22 .md + .json pairs
 │   └── eval_set.json          35 eval entries (clear / paraphrased / insufficient_evidence)
 ├── docs/
 │   ├── architecture.md        Canonical Tollgate service names + constraints
 │   ├── postmortem_template.md Exact section headers required by Phase 2 chunker
 │   ├── phase0_deep_dive.md    Phase 0 learning guide + interview Q&A
 │   ├── phase1_deep_dive.md    Phase 1 learning guide + interview Q&A
+│   ├── phase1_eval_findings.md Phase 1 baseline retrieval eval results
 │   └── interview_story.md     Full project narrative for interviews
 ├── scripts/
-│   └── seed_incidents.py      Calls POST /incidents for all 25 postmortems
+│   ├── seed_incidents.py      Calls POST /incidents for all 22 postmortems
+│   └── run_eval.py            Evaluates vector retrieval against baseline
 └── tests/
     └── test_phase1.py         7 pytest tests (all passing)
 ```
 
 ---
 
-## Corpus
+## 📚 Corpus
 
-**25 postmortems** covering realistic failure modes in a fictional SaaS org (Tollgate):
+**22 postmortems** covering realistic failure modes in a fictional SaaS org (Tollgate):
 
 | Category | Examples |
 |---|---|
-| Redis failures | Fail-open double-charge, circuit breaker flapping, async queue eviction |
-| Auth failures | Refresh token replay, JWT clock skew, rolling deploy key mismatch |
-| Billing failures | HMAC mismatch silent drop, idempotent upsert race, idempotency window |
-| Infrastructure | Postgres pool exhaustion, thundering herd, DNS TTL stale, TLS cert expiry |
-| API layer | Rate limiter + retry storm, route regex 404, log sink backpressure |
+| 🔴 **Redis** | Fail-open double-charge, circuit breaker flapping, async queue eviction |
+| 🟡 **Auth** | Refresh token replay, JWT clock skew, rolling deploy key mismatch |
+| 🟢 **Billing** | HMAC mismatch silent drop, idempotent upsert race, idempotency window |
+| 🔵 **Infra** | Postgres pool exhaustion, thundering herd, DNS TTL stale, TLS cert expiry |
+| 🟣 **API** | Rate limiter + retry storm, route regex 404, log sink backpressure |
 
 **Eval set (35 entries, 3 tiers):**
 - `clear` (22) — direct retrieval
@@ -160,34 +164,34 @@ POST /query
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Choice | Why |
 |---|---|---|
-| API | FastAPI | Async, type-safe, auto-docs |
-| DB + Vector | PostgreSQL + pgvector | Free, self-hosted, exact cosine at this scale |
-| Embeddings | all-MiniLM-L6-v2 (local) | Free, no API call, upgradeable to bge-large if eval shows quality bottleneck |
-| LLM (runtime) | Groq llama-3.1-8b-instant | Free tier, fast, provider-swappable via .env |
-| LLM (eval judge) | GPT-4o-mini | Consistent quality for RAGAS scoring |
-| Schema | SQLAlchemy ORM | Single source of truth (no DDL drift vs. Python models) |
-| Infrastructure | Docker Compose | One-command setup, pinned versions |
+| **API** | FastAPI | Async, type-safe, auto-docs |
+| **DB + Vector** | PostgreSQL + pgvector | Free, self-hosted, exact cosine at this scale |
+| **Embeddings** | all-MiniLM-L6-v2 (local) | Free, no API call, upgradeable to bge-large if eval shows quality bottleneck |
+| **LLM (runtime)** | Groq llama-3.1-8b-instant | Free tier, fast, provider-swappable via .env |
+| **LLM (eval judge)**| GPT-4o-mini | Consistent quality for RAGAS scoring |
+| **Schema** | SQLAlchemy ORM | Single source of truth (no DDL drift vs. Python models) |
+| **Infrastructure** | Docker Compose | One-command setup, pinned versions |
 
 ---
 
-## Phase Roadmap
+## 🗺️ Phase Roadmap
 
 | Phase | Status | What it adds |
 |---|---|---|
-| 0 — Data + Infrastructure | ✅ Complete | Docker, FastAPI, 22 postmortems, eval set |
-| 1 — Naive RAG | ✅ Complete | Chunking, embedding, cosine retrieval, Groq generation |
-| 2 — Advanced RAG | 🔜 Next | BM25 hybrid, cross-encoder rerank, structure-aware chunking, RAGAS eval |
-| 3 — Agentic RAG | 📅 Planned | LangGraph router + retry loop + confidence gate + log tool |
-| 3.5 — UI | 📅 Planned | React + Vite step-trace panel via SSE streaming |
-| 4 — Observability + Security | 📅 Planned | LangSmith tracing, prompt injection defense, RBAC |
+| **0 — Data + Infrastructure** | ✅ Complete | Docker, FastAPI, 22 postmortems, eval set |
+| **1 — Naive RAG** | ✅ Complete | Chunking, embedding, cosine retrieval, Groq generation |
+| **2 — Advanced RAG** | 🔜 Next | BM25 hybrid, cross-encoder rerank, structure-aware chunking, RAGAS eval |
+| **3 — Agentic RAG** | 📅 Planned | LangGraph router + retry loop + confidence gate + log tool |
+| **3.5 — UI** | 📅 Planned | React + Vite step-trace panel via SSE streaming |
+| **4 — Observability + Security**| 📅 Planned | LangSmith tracing, prompt injection defense, RBAC |
 
 ---
 
-## Environment Variables
+## ⚙️ Environment Variables
 
 ```bash
 # Required
@@ -207,7 +211,7 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/incident_investi
 
 ---
 
-## Running Tests
+## 🧪 Running Tests
 
 ```bash
 pytest tests/test_phase1.py -v
@@ -217,4 +221,4 @@ pytest tests/test_phase1.py -v
 
 ---
 
-*Phase 0 + 1 complete. See `docs/interview_story.md` for the full project narrative.*
+*Phase 0 + 1 complete. See [`docs/interview_story.md`](docs/interview_story.md) for the full project narrative.*
