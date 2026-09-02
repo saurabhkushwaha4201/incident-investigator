@@ -50,4 +50,6 @@ jobs:
         TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/incident_investigator_test
         GROQ_API_KEY: "test_key_does_not_need_to_be_real"
       run: |
+        # The db service doesn't mount init.sql like docker-compose does, so we create the extension manually
+        psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS vector;"
         pytest tests/test_phase1.py -v
